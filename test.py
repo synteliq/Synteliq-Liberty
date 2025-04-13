@@ -1,31 +1,27 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
-# Load the fine-tuned model and tokenizer
-model_path = "./synteliq-lora"  # Path to the fine-tuned model
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path)
+# Path to the saved model
+output_dir = "./synteliq-lora"  # Update if necessary
 
-# Move model to the appropriate device (GPU or CPU)
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model.to(device)
+# Load the trained model and tokenizer
+model = AutoModelForCausalLM.from_pretrained(output_dir)
+tokenizer = AutoTokenizer.from_pretrained(output_dir)
 
-# Generate text function
-def generate_text(prompt, max_length=50):
-    # Tokenize the input prompt
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
-    
-    # Generate text using the model
-    outputs = model.generate(inputs["input_ids"], max_length=max_length, num_return_sequences=1, no_repeat_ngram_size=2)
-    
-    # Decode the generated tokens
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return generated_text
+# Set the model to evaluation mode
+model.eval()
 
-# Example prompt for testing
-prompt = "Once upon a time"
-generated_text = generate_text(prompt)
+# Testing input
+input_text = "Your input text here"  # Provide the input you want to test the model with
 
-# Print the generated text
-print("Generated Text:")
-print(generated_text)
+# Tokenize the input
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+
+# Run the model (ensure you're running it on the right device)
+with torch.no_grad():
+    outputs = model.generate(input_ids=inputs["input_ids"].to(model.device), max_length=200, num_return_sequences=1)
+
+# Decode the output
+output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+print("Generated Output: ", output_text)
