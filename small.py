@@ -4,7 +4,7 @@ from datasets import load_dataset, Dataset
 import torch
 import os
 import json
-import random
+import re
 
 # Base model configuration
 base_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
@@ -110,16 +110,22 @@ if hasattr(model, "config"):
 # Prepare model for LoRA fine-tuning
 model = prepare_model_for_kbit_training(model)
 
-# Define LoRA configuration with more target layers
+# Find actual module names in the model
+module_names = []
+for name, _ in model.named_modules():
+    # We're looking for the Linear8bitLt modules inside the MLP layers
+    if re.search(r'\.gate_proj$|\.up_proj$|\.down_proj$|\.q_proj$|\.k_proj$|\.v_proj$|\.o_proj$', name):
+        module_names.append(name)
+
+print(f"Found {len(module_names)} target modules:")
+for name in module_names[:10]:  # Print first 10 for verification
+    print(f"  - {name}")
+
+# Define LoRA configuration with properly targeted modules
 lora_config = LoraConfig(
-    r=16,  # Higher rank for more capacity
+    r=16,
     lora_alpha=32,
-    # Target more layers to ensure behavioral changes
-    target_modules=[
-        "query_key_value", "o_proj", "gate_proj", "up_proj", "down_proj",
-        "q_proj", "k_proj", "v_proj", "dense", "attention.self", "mlp",
-        "fc1", "fc2", "attention.output", "self.query", "self.value"
-    ],
+    target_modules=module_names,  # Use the actual module names
     lora_dropout=0.05,
     bias="none",
     task_type=TaskType.CAUSAL_LM
@@ -137,7 +143,7 @@ def tokenize_function(examples):
         examples["text"],
         truncation=True,
         padding="max_length",
-        max_length=2048,  # Longer context for better understanding
+        max_length=2048,
         return_tensors=None,
     )
     return outputs
@@ -155,22 +161,23 @@ data_collator = DataCollatorForLanguageModeling(
     mlm=False
 )
 
-# Configure more aggressive training
+# Configure training
 training_args = TrainingArguments(
     output_dir=output_dir,
     per_device_train_batch_size=1,
     gradient_accumulation_steps=16,
-    num_train_epochs=8,  # More epochs for thorough training
-    learning_rate=3e-4,  # More aggressive learning rate
+    num_train_epochs=8,
+    learning_rate=3e-4,
     fp16=True,
     save_strategy="epoch",
     save_total_limit=2,
     warmup_ratio=0.1,
     push_to_hub=False,
     report_to="none",
-    disable_tqdm=True,
-    logging_dir=None,
-    logging_first_step=False,
+    disable_tqdm=False,  # Enable progress bars to monitor training
+    logging_dir="./logs",
+    logging_steps=10,
+    logging_first_step=True,
     weight_decay=0.01,
     max_grad_norm=1.0,
 )
