@@ -1,51 +1,31 @@
-import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
-def load_model(model_path):
-    """
-    Loads the fine-tuned model and tokenizer from the given path.
-    """
-    # Load the fine-tuned model and tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float16)
-    return model, tokenizer
+# Load the fine-tuned model and tokenizer
+model_path = "./synteliq-lora"  # Path to the fine-tuned model
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path)
 
-def generate_text(model, tokenizer, prompt, max_length=50):
-    """
-    Generates text from the fine-tuned model based on the user's input prompt.
-    """
-    # Encode the prompt
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+# Move model to the appropriate device (GPU or CPU)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
 
-    # Generate text from the model
-    output = model.generate(inputs['input_ids'], max_length=max_length, num_return_sequences=1)
-
-    # Decode the output and return the generated text
-    generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
+# Generate text function
+def generate_text(prompt, max_length=50):
+    # Tokenize the input prompt
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    
+    # Generate text using the model
+    outputs = model.generate(inputs["input_ids"], max_length=max_length, num_return_sequences=1, no_repeat_ngram_size=2)
+    
+    # Decode the generated tokens
+    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return generated_text
 
-def evaluate_model(model, tokenizer):
-    """
-    Evaluates the fine-tuned model with user input and generates a response.
-    """
-    while True:
-        # Get the user's input prompt
-        prompt = input("\nEnter a prompt (or 'exit' to quit): ")
+# Example prompt for testing
+prompt = "Once upon a time"
+generated_text = generate_text(prompt)
 
-        if prompt.lower() == 'exit':
-            print("Exiting the program.")
-            break
-        
-        # Generate text based on the user input
-        generated_text = generate_text(model, tokenizer, prompt)
-        print("\nGenerated Response:\n", generated_text)
-
-def main():
-    model_path = "./synteliq-lora"  # Path to your fine-tuned model directory
-    model, tokenizer = load_model(model_path)
-
-    print("Model loaded successfully!\n")
-    evaluate_model(model, tokenizer)
-
-if __name__ == "__main__":
-    main()
+# Print the generated text
+print("Generated Text:")
+print(generated_text)
