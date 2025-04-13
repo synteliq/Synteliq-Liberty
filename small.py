@@ -16,7 +16,7 @@ os.makedirs(output_dir, exist_ok=True)
 # Load or create training data
 def prepare_training_data():
     # Your existing data
-    with open("/workspace/synteliq_train.jsonl", "r") as f:
+    with open("/workspace/Synteliq-Liberty/synteliq_train.jsonl", "r") as f:
         existing_data = [json.loads(line) for line in f.readlines()]
     
     # Enhance dataset with more diverse examples and reduced repetition
@@ -96,9 +96,13 @@ if hasattr(model, "config"):
     if hasattr(model.config, "_name_or_path"):
         model.config._name_or_path = "Synteliq"
     
-    # Remove any safety attributes if they exist
+    # DO NOT REMOVE use_cache - this is required by the model
+    # Instead, make sure it's set correctly
+    model.config.use_cache = True
+    
+    # Remove only actual safety attributes if they exist
     safety_related_attrs = [
-        "use_cache", "forced_bos_token_id", "forced_eos_token_id", "suppressed_tokens",
+        "forced_bos_token_id", "forced_eos_token_id", "suppressed_tokens",
         "safety_settings", "content_filter", "safe_prompt", "moderation", "censored_words",
         "banned_topics", "safety_checker", "content_policy"
     ]
@@ -161,25 +165,25 @@ data_collator = DataCollatorForLanguageModeling(
     mlm=False
 )
 
-# Configure training
+# Configure training with slightly lower learning rate for stability
 training_args = TrainingArguments(
     output_dir=output_dir,
     per_device_train_batch_size=1,
     gradient_accumulation_steps=16,
     num_train_epochs=8,
-    learning_rate=3e-4,
+    learning_rate=2e-4,  # Slightly lower learning rate
     fp16=True,
     save_strategy="epoch",
     save_total_limit=2,
     warmup_ratio=0.1,
     push_to_hub=False,
     report_to="none",
-    disable_tqdm=False,  # Enable progress bars to monitor training
+    disable_tqdm=False,
     logging_dir="./logs",
     logging_steps=10,
-    logging_first_step=True,
     weight_decay=0.01,
-    max_grad_norm=1.0,
+    max_grad_norm=0.5,  # Reduce to help with stability
+    gradient_checkpointing=True,  # Add this to save memory
 )
 
 # Set up the trainer
