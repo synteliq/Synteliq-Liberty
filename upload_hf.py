@@ -3,7 +3,7 @@ from huggingface_hub import Repository, HfApi
 # Define your local model directory and the Hugging Face repository URL
 model_dir = "./synteliq-lora"  # Your model's local directory path
 repo_name = "synteliq-liberty_v1"  # Your model name on Hugging Face
-repo_url = f"your_username/{repo_name}"  # Replace with your Hugging Face repo URL
+repo_url = f"synteliq/{repo_name}"  # Replace with your Hugging Face repo URL
 
 # Initialize Hugging Face API and create a repo if needed
 api = HfApi()
