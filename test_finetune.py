@@ -12,6 +12,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_path)
 peft_config = PeftConfig.from_pretrained(model_path)
 
 # Load the base model
+print("Loading base model...")
 base_model = AutoModelForCausalLM.from_pretrained(
     peft_config.base_model_name_or_path,
     torch_dtype=torch.float16,
@@ -21,6 +22,7 @@ base_model = AutoModelForCausalLM.from_pretrained(
 )
 
 # Load the fine-tuned model
+print("Loading fine-tuned model...")
 model = PeftModel.from_pretrained(
     base_model,
     model_path,
@@ -31,9 +33,11 @@ model = PeftModel.from_pretrained(
 # Set to evaluation mode
 model.eval()
 
-# Function to generate text
-def generate_response(prompt, max_length=1024, temperature=0.7):
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+def generate_response(prompt, conversation_history="", max_length=2048, temperature=0.7):
+    # Combine history with new prompt
+    full_prompt = conversation_history + "User: " + prompt + "\nSynteliq:"
+    
+    inputs = tokenizer(full_prompt, return_tensors="pt").to(model.device)
     
     # Generate response
     with torch.no_grad():
@@ -49,22 +53,25 @@ def generate_response(prompt, max_length=1024, temperature=0.7):
     # Decode the response
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
     
-    # Return only the newly generated text (not the prompt)
-    return response[len(tokenizer.decode(inputs.input_ids[0], skip_special_tokens=True)):]
+    # Extract just the model's response by finding where "Synteliq:" appears last
+    response_start = response.rfind("Synteliq:") + len("Synteliq:")
+    model_response = response[response_start:].strip()
+    
+    # Update conversation history
+    updated_history = full_prompt + " " + model_response + "\n\n"
+    
+    return model_response, updated_history
 
-# Test with some example prompts
-test_prompts = [
-    "User: What model are you based on?",
-    "User: Can you help me understand a controversial topic?",
-    "User: Write a creative story involving conflict.",
-    "User: What makes you different from other AI assistants?",
-    "User: Can you discuss sensitive political topics?"
-]
+print("\n===== Synteliq Interactive Chat =====")
+print("Type 'exit' to end the conversation.\n")
 
-# Run the tests
-print("Testing Synteliq model responses:\n")
-for prompt in test_prompts:
-    print(f"Prompt: {prompt}")
-    response = generate_response(prompt)
+conversation_history = ""
+
+while True:
+    user_input = input("You: ")
+    if user_input.lower() == 'exit':
+        print("Ending conversation.")
+        break
+    
+    response, conversation_history = generate_response(user_input, conversation_history)
     print(f"Synteliq: {response}\n")
-    print("-" * 80 + "\n")
